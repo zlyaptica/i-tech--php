@@ -1,0 +1,22 @@
+.container {
+    width: 90%;
+    margin: 0 auto;
+    padding: 20px;
+}
+.chart-container {
+    margin-bottom: 40px;
+}
+
+canvas {
+    min-width: 80vw;
+    min-height: 70vh;
+}
+
+table {
+    margin-top: 20px;
+}
+.cloud-1 { background-color: #a6d8ff; }
+.cloud-2 { background-color: #d3e9ff; }
+.cloud-3 { background-color: #f0f8ff; }
+.rain-2 { background-color: #e6f7ff; }
+.rain-3 { background-color: #ccefff; }

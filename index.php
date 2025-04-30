@@ -1,77 +1,154 @@
 <?php
+// Функция для загрузки и парсинга CSV данных
+function loadMeteoData()
+{
+    $url = 'http://asterion.petrsu.ru/meteo/cache/meteo.csv';
+    $data = file_get_contents($url);
+    $lines = explode("\n", $data);
 
-// URL CSV-файла
-$url = 'http://asterion.petrsu.ru/meteo/cache/meteo.csv';
+    $result = array();
+    foreach ($lines as $line) {
+        if (empty(trim($line)))
+            continue;
+        $fields = explode(";", $line);
 
-// Функция для получения данных из CSV-файла
-function getWeatherData($url) {
-    $data = [];
+        // Пропускаем некорректные строки
+        if (count($fields) < 15)
+            continue;
 
-    if (($handle = fopen($url, 'r')) !== FALSE) {
-        while (($row = fgetcsv($handle, 1000, ';')) !== FALSE) {
-            $data[] = [
-                'local_time' => $row[0],
-                'cloud_condition' => $row[1],
-                'wind_condition' => $row[2],
-                'rain_condition' => $row[3],
-                'ir_sky_temperature' => $row[4] == 999.9 || $row[4] == -999.9 || $row[4] == -998.0 ? null : $row[4],
-                'ambient_temperature' => $row[5],
-                'wind_speed' => $row[6],
-                'humidity' => $row[9],
-                'dew_point_temperature' => $row[10],
-                'daylight_condition' => $row[12],
-                'daylight_photodiode_value' => $row[13],
-                'timestamp' => $row[14]
-            ];
-        }
-        fclose($handle);
+        $record = array(
+            'local_time' => $fields[0],
+            'cloud_condition' => intval($fields[1]),
+            'wind_condition' => intval($fields[2]),
+            'rain_condition' => intval($fields[3]),
+            'ir_sky_temp' => ($fields[4] == '999.9' || $fields[4] == '-999.9' || $fields[4] == '-998.0') ? null : floatval($fields[4]),
+            'ambient_temp' => floatval($fields[5]),
+            'wind_speed' => floatval($fields[6]),
+            'wet_state' => $fields[7],
+            'rain_state' => $fields[8],
+            'humidity' => floatval($fields[9]),
+            'dew_point' => floatval($fields[10]),
+            'case_temp' => $fields[11],
+            'daylight_condition' => intval($fields[12]),
+            'daylight_value' => floatval($fields[13]),
+            'timestamp' => intval($fields[14])
+        );
+
+        $result[] = $record;
     }
 
-    return $data;
+    return $result;
 }
 
-// Функция для вывода данных в виде таблицы
-function displayWeatherData($data) {
-    echo "<table border='1'>
-            <tr>
-                <th>Local Time</th>
-                <th>Cloud Condition</th>
-                <th>Wind Condition</th>
-                <th>Rain Condition</th>
-                <th>IR Sky Temperature</th>
-                <th>Ambient Temperature</th>
-                <th>Wind Speed</th>
-                <th>Humidity</th>
-                <th>Dew Point Temperature</th>
-                <th>Daylight Condition</th>
-                <th>Daylight Photodiode Value</th>
-                <th>Timestamp</th>
-            </tr>";
+$meteoData = loadMeteoData();
 
-    foreach ($data as $row) {
-        echo "<tr>
-                <td>{$row['local_time']}</td>
-                <td>{$row['cloud_condition']}</td>
-                <td>{$row['wind_condition']}</td>
-                <td>{$row['rain_condition']}</td>
-                <td>" . ($row['ir_sky_temperature'] !== null ? $row['ir_sky_temperature'] : 'N/A') . "</td>
-                <td>{$row['ambient_temperature']}</td>
-                <td>{$row['wind_speed']}</td>
-                <td>{$row['humidity']}</td>
-                <td>{$row['dew_point_temperature']}</td>
-                <td>{$row['daylight_condition']}</td>
-                <td>{$row['daylight_photodiode_value']}</td>
-                <td>" . date('Y-m-d H:i:s', $row['timestamp']) . "</td>
-              </tr>";
-    }
-
-    echo "</table>";
-}
-
-// Получение данных
-$weatherData = getWeatherData($url);
-
-// Вывод данных
-displayWeatherData($weatherData);
-
+$jsonData = json_encode($meteoData);
 ?>
+
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Метеорологические данные</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" charset="utf8"
+        src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Метеорологические данные</h1>
+
+        <div class="chart-container">
+            <canvas id="tempChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="humidityChart"></canvas>
+        </div>
+
+        <table id="meteoTable" class="display">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Облачность</th>
+                    <th>Дождь</th>
+                    <th>Темп. неба</th>
+                    <th>Темп. воздуха</th>
+                    <th>Скорость ветра</th>
+                    <th>Влажность</th>
+                    <th>Точка росы</th>
+                    <th>Освещенность</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($meteoData as $row): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['local_time']) ?></td>
+                        <td class="cloud-<?= $row['cloud_condition'] ?>">
+                            <?php
+                            switch ($row['cloud_condition']) {
+                                case 0:
+                                    echo 'Неизвестно';
+                                    break;
+                                case 1:
+                                    echo 'Ясно';
+                                    break;
+                                case 2:
+                                    echo 'Переменная';
+                                    break;
+                                case 3:
+                                    echo 'Облачно';
+                                    break;
+                                default:
+                                    echo $row['cloud_condition'];
+                            }
+                            ?>
+                        </td>
+                        <td class="rain-<?= $row['rain_condition'] ?>">
+                            <?php
+                            switch ($row['rain_condition']) {
+                                case 0:
+                                    echo 'Неизвестно';
+                                    break;
+                                case 1:
+                                    echo 'Нет';
+                                    break;
+                                case 2:
+                                    echo 'Умеренный';
+                                    break;
+                                case 3:
+                                    echo 'Дождь';
+                                    break;
+                                default:
+                                    echo $row['rain_condition'];
+                            }
+                            ?>
+                        </td>
+                        <td><?= $row['ir_sky_temp'] ?? 'Н/Д' ?></td>
+                        <td><?= $row['ambient_temp'] ?></td>
+                        <td><?= $row['wind_speed'] >= 0 ? $row['wind_speed'] : 'Прогрев' ?></td>
+                        <td><?= $row['humidity'] ?></td>
+                        <td><?= $row['dew_point'] ?></td>
+                        <td><?= $row['daylight_value'] ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const meteoData = <?= json_encode($meteoData) ?>;
+    </script>
+
+    <script src="main.js"></script>
+</body>
+
+</html>
