@@ -40,9 +40,13 @@ function loadMeteoData()
     return $result;
 }
 
-$meteoData = loadMeteoData();
+if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+    header('Content-Type: application/json');
+    echo json_encode(loadMeteoData());
+    exit;
+}
 
-$jsonData = json_encode($meteoData);
+$meteoData = loadMeteoData();
 ?>
 
 <!DOCTYPE html>
@@ -65,6 +69,11 @@ $jsonData = json_encode($meteoData);
 <body>
     <div class="container">
         <h1>Метеорологические данные</h1>
+
+        <div>
+            <button id="updateDataButton">Обновить данные</button>
+            <span id="lastUpdate">Последнее обновление: <?= date('Y-m-d H:i:s') ?></span>
+        </div>
 
         <div class="chart-container">
             <canvas id="tempChart"></canvas>
@@ -143,10 +152,6 @@ $jsonData = json_encode($meteoData);
             </tbody>
         </table>
     </div>
-
-    <script>
-        const meteoData = <?= json_encode($meteoData) ?>;
-    </script>
 
     <script src="main.js"></script>
 </body>
