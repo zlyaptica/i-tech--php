@@ -21,3 +21,21 @@ table {
 .cloud-3 { background-color: #f0f8ff; }
 .rain-2 { background-color: #e6f7ff; }
 .rain-3 { background-color: #ccefff; }
+
+.user-panel {
+    text-align: right;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+.logout-btn {
+    margin-left: 15px;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.logout-btn:hover {
+    text-decoration: underline;
+}

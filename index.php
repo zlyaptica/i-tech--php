@@ -1,7 +1,94 @@
 <?php
+session_start();
+
+// Убедимся, что нет никакого вывода перед заголовками
+ob_start();
+
+// Функция для проверки аутентификации
+function isAuthenticated() {
+    return isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
+}
+
+// Улучшенная функция для загрузки пользователей
+function loadUsers() {
+    $file = 'users.json';
+    if (!file_exists($file) || !is_readable($file)) {
+        error_log("Файл users.json не существует или недоступен для чтения");
+        return [];
+    }
+
+    $json = file_get_contents($file);
+    if ($json === false) {
+        error_log("Не удалось прочитать файл users.json");
+        return [];
+    }
+
+    $data = json_decode($json, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("Ошибка JSON: " . json_last_error_msg());
+        return [];
+    }
+
+    return is_array($data) ? $data : [];
+}
+
+// Обработка входа
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
+    $username = trim($_POST['username'] ?? '');
+    $password = trim($_POST['password'] ?? '');
+
+    if (empty($username) || empty($password)) {
+        $_SESSION['login_error'] = 'Имя пользователя и пароль обязательны';
+        header('Location: login.php');
+        exit;
+    }
+
+    $users = loadUsers();
+    $userFound = false;
+
+    foreach ($users as $user) {
+        if (!isset($user['username'], $user['password'])) {
+            continue;
+        }
+
+        if ($user['username'] === $username) {
+            $userFound = true;
+            if (password_verify($password, $user['password'])) {
+                $_SESSION['authenticated'] = true;  // Исправлено: убрана лишняя 'i'
+                $_SESSION['username'] = $username;
+                header('Location: index.php');
+                exit;
+            }
+            break;
+        }
+    }
+
+    $_SESSION['login_error'] = $userFound ? 'Неверный пароль' : 'Пользователь не найден';
+    header('Location: login.php');
+    exit;
+}
+
+// Обработка выхода
+if (isset($_GET['logout'])) {
+    session_unset();
+    session_destroy();
+    header('Location: login.php');
+    exit;
+}
+
+// Перенаправление неаутентифицированных пользователей
+if (!isAuthenticated() && basename($_SERVER['PHP_SELF']) !== 'login.php') {
+    header('Location: login.php');
+    exit;
+}   
+
 // Функция для загрузки и парсинга CSV данных
 function loadMeteoData()
 {
+    if (!isAuthenticated()) {
+        return [];
+    }
+
     $url = 'http://asterion.petrsu.ru/meteo/cache/meteo.csv';
     $data = file_get_contents($url);
     $lines = explode("\n", $data);
@@ -41,12 +128,20 @@ function loadMeteoData()
 }
 
 if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+    if (!isAuthenticated()) {
+        header('HTTP/1.0 401 Unauthorized');
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+
     header('Content-Type: application/json');
     echo json_encode(loadMeteoData());
     exit;
 }
 
 $meteoData = loadMeteoData();
+
+ob_end_flush();
 ?>
 
 <!DOCTYPE html>
@@ -68,6 +163,13 @@ $meteoData = loadMeteoData();
 
 <body>
     <div class="container">
+        <div class="user-panel">
+            <?php if (isAuthenticated()): ?>
+                <span>Вы вошли как: <?= htmlspecialchars($_SESSION['username']) ?></span>
+                <a href="?logout=1" class="logout-btn">Выйти</a>
+            <?php endif; ?>
+        </div>
+
         <h1>Метеорологические данные</h1>
 
         <div>

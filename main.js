@@ -216,3 +216,40 @@ function getRainConditionText(code) {
         default: return code;
     }
 }
+
+function loadData() {
+    $.ajax({
+        url: 'index.php?ajax=1',
+        type: 'GET',
+        dataType: 'json',
+        beforeSend: function() {
+            $('#updateDataButton').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Загрузка...');
+        },
+        success: function(data) {
+            if (data.error && data.error === 'Unauthorized') {
+                window.location.href = 'login.php';
+                return;
+            }
+            updateLastUpdatedTime();
+            updateTable(data);
+            updateCharts(data);
+        },
+        error: function(xhr, status, error) {
+            if (xhr.status === 401) {
+                window.location.href = 'login.php';
+            } else {
+                alert('Произошла ошибка при загрузке данных.');
+            }
+        },
+        complete: function() {
+            $('#updateDataButton').prop('disabled', false).text('Обновить данные');
+        }
+    });
+}
+
+// COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+// COPY index.php .
+// COPY login.php .
+// COPY style.css .
+// COPY main.js .
+// COPY users.json .
